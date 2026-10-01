@@ -5,34 +5,48 @@ import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CLASS_DOCUMENT, createDefaultStudents, normalizeStudents, rankStudents, type Student } from '@/lib/classroom';
-import { Podium } from '@/components/classroom-ui';
+import { Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (sessionStorage.getItem('isAdminLoggedIn') !== 'true') {
-      router.push('/');
+      router.replace('/');
       return;
     }
+    setIsAuthorized(true);
 
     const classRef = doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id);
-    return onSnapshot(classRef, (snapshot) => {
-      setStudents(snapshot.exists() ? normalizeStudents(snapshot.data().students) : createDefaultStudents());
-      setError('');
-      setIsAuthorized(true);
+    return onSnapshot(classRef, async (snapshot) => {
+      if (snapshot.exists()) {
+        setStudents(normalizeStudents(snapshot.data().students));
+        setError('');
+      } else {
+        const defaults = createDefaultStudents();
+        try {
+          await setDoc(classRef, { students: defaults }, { merge: true });
+          setStudents(defaults);
+          setError('');
+        } catch {
+          setError('Data kelas gagal diinisialisasi. Periksa koneksi Firebase.');
+        }
+      }
+      setLoading(false);
     }, () => {
       setError('Data kelas gagal dimuat. Periksa koneksi Firebase.');
-      setIsAuthorized(true);
+      setLoading(false);
     });
   }, [router]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAdminLoggedIn');
-    router.push('/');
+    sessionStorage.removeItem('isStudentLoggedIn');
+    router.replace('/');
   };
 
   const saveStudents = async (updated: Student[]) => {
@@ -53,34 +67,115 @@ export default function AdminPage() {
   };
 
   if (!isAuthorized) return null;
+  
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-amber-50 flex items-center justify-center font-black text-blue-900 text-xl">
+        Sabar ya bestie, lagi nyiapin data nih... 🍌
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-amber-50 p-4 pb-16 font-sans text-slate-800">
-      <header className="py-4 text-center">
-        <h1 className="text-3xl font-black text-amber-500">ADMIN DASHBOARD</h1>
-        <p className="text-sm font-extrabold">Hyundai Jump School Batch 3 · Kelas X SMKS YPUL Lagoa</p>
-        <button onClick={handleLogout} className="mt-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-red-600">Keluar (Logout)</button>
-      </header>
-      {error && <p role="alert" className="mx-auto max-w-xl rounded-xl bg-red-100 p-3 text-center text-sm font-bold text-red-700">{error}</p>}
-      <Podium students={ranked} />
-      <section className="mx-auto max-w-xl">
-        <h2 className="mb-3 text-center text-xl font-black">Kelola Poin & Nama Peserta</h2>
-        <div className="space-y-2">
-          {ranked.map((student) => (
-            <div key={student.originalIndex} className="flex items-center justify-between gap-2 rounded-2xl border-2 border-amber-200 bg-white p-3 shadow-sm">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black">{student.rank}</div>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-200 text-xs font-black text-blue-900">{student.n.charAt(0).toUpperCase()}</div>
-                <div className="min-w-0 text-left"><span className="block truncate text-sm font-bold">{student.n}</span><button onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-blue-900 hover:bg-amber-200">✏️ Ganti Nama</button></div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <div className="flex gap-1"><button aria-label={`Kurangi poin ${student.n}`} onClick={() => changePoints(student.originalIndex, -1)} className="h-8 w-8 rounded-lg bg-red-500 font-black text-white hover:bg-red-600">−</button><button aria-label={`Tambah poin ${student.n}`} onClick={() => changePoints(student.originalIndex, 1)} className="h-8 w-8 rounded-lg bg-blue-600 font-black text-white hover:bg-blue-700">+</button></div>
-                <span className="min-w-8 text-right text-lg font-black text-blue-600">{student.p}</span>
-              </div>
-            </div>
-          ))}
+    <div className="min-h-screen bg-[#fff2b0] flex flex-col justify-between font-sans text-slate-800">
+      {/* Header */}
+      <header className="dashboard-header sticky top-0 z-50 flex w-full items-center justify-between gap-2 border-b-2 border-blue-900 bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 px-3 py-2.5 shadow-md sm:px-6">
+        <div className="flex items-center gap-2 font-black text-blue-950 text-sm md:text-lg">
+          <span>🏆</span>
+          <span>Leaderboard Kelas X</span>
         </div>
-      </section>
-    </main>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="rounded-full border border-amber-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 shadow-xs sm:px-3 sm:text-sm">
+            freya · <span className="text-blue-600">Admin</span>
+          </div>
+          <button 
+            onClick={handleLogout} 
+            className="rounded-full bg-blue-900 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-800 sm:px-4 sm:text-sm"
+          >
+            Logout
+          </button>
+        </div>
+      </header>
+
+      {/* Konten Utama */}
+      <main className="mx-auto w-full max-w-2xl flex-1 px-3 pb-12 sm:px-4">
+        <div className="dashboard-hero">
+        <Spotlights />
+        <div className="dashboard-title my-5 text-center sm:my-6">
+          <h1
+            className="text-[clamp(34px,6.3vw,64px)] font-black leading-[1.05] text-[#f7d33f]"
+            style={{ textShadow: '3px 3px 1px #2a4a9e' }}
+          >
+            LEADERBOARD 2026 
+          </h1>
+          <p className="mt-1 text-[clamp(14px,3.6vw,20px)] font-black text-[#1b1b2f]">
+            Hyundai Jump School Batch 3
+          </p>
+          <p className="mt-0.5 text-[13px] font-medium text-slate-600">
+            Kelas X SMKS YPUL Lagoa
+          </p>
+        </div>
+
+        {error && <p role="alert" className="mx-auto max-w-xl rounded-xl bg-red-100 p-3 text-center text-sm font-bold text-red-700 mb-4">{error}</p>}
+        
+        <Podium students={ranked} />
+
+        <a href="#ranking-list" className="scroll-cue mx-auto -mt-1 mb-5 flex w-fit items-center gap-2 text-sm font-extrabold text-blue-900 transition hover:text-blue-700">
+          Geser ke bawah untuk lihat ranking <span className="animate-bounce text-lg" aria-hidden="true">↓</span>
+        </a>
+        </div>
+
+        <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta</h2>
+          <div className="space-y-2.5">
+            {ranked.map((student) => (
+              <div key={student.originalIndex} className="flex items-center justify-between gap-2 rounded-[14px] border-2 border-[#f0e2a0] bg-gradient-to-r from-[#fffbe6] to-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-blue-950">{student.rank}</div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
+                  <div className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-bold text-slate-800">{student.n}</span>
+                    <button onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 hover:bg-amber-100 transition">✏️ Ubah Panggilan</button>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                  <div className="flex gap-1">
+                    <button aria-label={`Kurangi poin ${student.n}`} onClick={() => changePoints(student.originalIndex, -1)} className="h-8 w-8 rounded-lg bg-red-500 font-black text-white hover:bg-red-600 transition">−</button>
+                    <button aria-label={`Tambah poin ${student.n}`} onClick={() => changePoints(student.originalIndex, 1)} className="h-8 w-8 rounded-lg bg-blue-600 font-black text-white hover:bg-blue-700 transition">+</button>
+                  </div>
+                  <span className="min-w-8 text-right text-lg font-black text-[#2a4a9e]">{student.p}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="w-full bg-[#2b4c9f] text-white py-6 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 shadow-inner">
+        <div className="flex items-center gap-3.5">
+          <a 
+            href="https://instagram.com" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="w-10 h-10 rounded-full border-2 border-white/80 flex items-center justify-center hover:bg-white/10 transition shadow-md"
+            aria-label="Instagram"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+              <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+            </svg>
+          </a>
+          <span className="text-sm font-bold tracking-wide">Silahturahmi ke IG kita!</span>
+        </div>
+
+        <div className="text-xs text-blue-100/80 font-medium text-center md:text-right space-y-0.5">
+          <p>Hyundai Jump School Batch 3 · Kelas X SMKS YPUL Lagoa</p>
+          <p>© 2026 Program Mengajar Hyundai Jump School</p>
+        </div>
+      </footer>
+    </div>
   );
 }

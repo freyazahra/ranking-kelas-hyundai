@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const MinionSvg = () => (
-  <svg className="login-minion" viewBox="0 0 100 150" aria-hidden="true">
+  <svg className="login-minion w-24 md:w-32 mx-auto animate-bounce" viewBox="0 0 100 150" aria-hidden="true">
     <g className="login-minion-arms">
       <rect x="2" y="62" width="20" height="9" rx="4.5" fill="#f7d33f" stroke="#c99a00" strokeWidth="2" transform="rotate(-30 22 66)"/>
       <rect x="78" y="62" width="20" height="9" rx="4.5" fill="#f7d33f" stroke="#c99a00" strokeWidth="2" transform="rotate(30 78 66)"/>
@@ -38,6 +38,7 @@ export default function LoginPage() {
       sessionStorage.setItem('isAdminLoggedIn', 'true');
       router.push('/admin');
     } else if (username === 'muridkece' && password === 'murid123') {
+      sessionStorage.setItem('isStudentLoggedIn', 'true');
       router.push('/student');
     } else {
       setError('Username atau Password salah! Akses ditolak.');
@@ -97,7 +98,7 @@ export default function LoginPage() {
           type="submit"
           className="bg-blue-900 text-white font-black text-base py-3.5 rounded-xl shadow-lg hover:bg-blue-800 transition transform active:scale-95 mt-2"
         >
-          Masuk Web 🎵
+          Masuk Web 
         </button>
       </form>
     </main>
