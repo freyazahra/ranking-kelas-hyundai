@@ -35,6 +35,7 @@ export default function LoginPage() {
     setError('');
 
     if (username === 'mentorkece' && password === 'kecebong!') {
+      sessionStorage.setItem('isAdminLoggedIn', 'true');
       router.push('/admin');
     } else if (username === 'muridkece' && password === 'murid123') {
       router.push('/student');

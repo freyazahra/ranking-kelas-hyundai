@@ -10,15 +10,30 @@ import { Podium } from '@/components/classroom-ui';
 export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
   const [error, setError] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    if (sessionStorage.getItem('isAdminLoggedIn') !== 'true') {
+      router.push('/');
+      return;
+    }
+
     const classRef = doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id);
     return onSnapshot(classRef, (snapshot) => {
       setStudents(snapshot.exists() ? normalizeStudents(snapshot.data().students) : createDefaultStudents());
       setError('');
-    }, () => setError('Data kelas gagal dimuat. Periksa koneksi Firebase.'));
-  }, []);
+      setIsAuthorized(true);
+    }, () => {
+      setError('Data kelas gagal dimuat. Periksa koneksi Firebase.');
+      setIsAuthorized(true);
+    });
+  }, [router]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('isAdminLoggedIn');
+    router.push('/');
+  };
 
   const saveStudents = async (updated: Student[]) => {
     setStudents(updated);
@@ -37,12 +52,14 @@ export default function AdminPage() {
     if (name) void saveStudents(students.map((student, studentIndex) => studentIndex === index ? { ...student, n: name } : student));
   };
 
+  if (!isAuthorized) return null;
+
   return (
     <main className="min-h-screen bg-amber-50 p-4 pb-16 font-sans text-slate-800">
       <header className="py-4 text-center">
         <h1 className="text-3xl font-black text-amber-500">ADMIN DASHBOARD</h1>
         <p className="text-sm font-extrabold">Hyundai Jump School Batch 3 · Kelas X SMKS YPUL Lagoa</p>
-        <button onClick={() => router.push('/')} className="mt-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-red-600">Keluar (Logout)</button>
+        <button onClick={handleLogout} className="mt-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-red-600">Keluar (Logout)</button>
       </header>
       {error && <p role="alert" className="mx-auto max-w-xl rounded-xl bg-red-100 p-3 text-center text-sm font-bold text-red-700">{error}</p>}
       <Podium students={ranked} />
