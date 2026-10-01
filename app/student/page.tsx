@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, CLASS_SIZE, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function StudentPage() {
@@ -145,7 +145,7 @@ export default function StudentPage() {
         </div>
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
-          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Semua Peserta & Poin <span className="text-base text-blue-700">({students.length} dari {CLASS_SIZE} siswa)</span></h2>
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Semua Peserta & Poin</h2>
           <div className="space-y-2.5">
             {ranked.map((student) => (
               <div key={student.originalIndex} className="flex items-center justify-between gap-3 rounded-[14px] border-2 border-[#f0e2a0] bg-gradient-to-r from-[#fffbe6] to-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-3">

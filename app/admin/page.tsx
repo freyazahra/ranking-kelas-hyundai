@@ -208,7 +208,7 @@ export default function AdminPage() {
         </div>
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
-          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta <span className="text-base text-blue-700">({students.length} dari {CLASS_SIZE} siswa)</span></h2>
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta</h2>
           {saveStatus === 'saving' && (
             <p role="status" className="mb-3 text-center text-sm font-bold text-blue-900">
               Menyimpan perubahan ke Firebase...
