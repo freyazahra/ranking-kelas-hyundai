@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, createDefaultStudents, normalizeStudents, rankStudents, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function StudentPage() {
@@ -24,24 +24,56 @@ export default function StudentPage() {
     }
     setIsAuthorized(true);
 
+    const initialBackup = loadStudentsBackup();
+    if (initialBackup) {
+      setStudents(initialBackup.students);
+      setLoading(false);
+      if (initialBackup.pendingSync) {
+        setError('Menampilkan perubahan yang tersimpan di browser admin; sinkronisasi cloud masih tertunda.');
+      }
+    }
+
     const classRef = doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id);
     return onSnapshot(classRef, async (snapshot) => {
+      const backup = loadStudentsBackup();
+      if (backup?.pendingSync) {
+        setStudents(backup.students);
+        setError('Menampilkan salinan lokal. Admin perlu menyinkronkan perubahan ini ke Firebase.');
+        setLoading(false);
+        return;
+      }
+
       if (snapshot.exists()) {
-        setStudents(normalizeStudents(snapshot.data().students));
+        const remoteStudents = normalizeStudents(snapshot.data().students);
+        setStudents(remoteStudents);
+        saveStudentsBackup(remoteStudents, false);
         setError('');
       } else {
+        if (backup) {
+          setStudents(backup.students);
+          setError('Dokumen Firebase belum tersedia. Menampilkan salinan di browser ini.');
+          setLoading(false);
+          return;
+        }
+
         const defaults = createDefaultStudents();
+        setStudents(defaults);
+        saveStudentsBackup(defaults, true);
         try {
           await setDoc(classRef, { students: defaults }, { merge: true });
-          setStudents(defaults);
+          saveStudentsBackup(defaults, false);
           setError('');
-        } catch {
-          setError('Data kelas gagal diinisialisasi. Periksa koneksi Firebase.');
+        } catch (initializationError) {
+          const details = initializationError instanceof Error ? initializationError.message : 'Kesalahan tidak diketahui';
+          setError(`Data tersimpan di browser ini, tetapi gagal diinisialisasi ke Firebase: ${details}`);
         }
       }
       setLoading(false);
-    }, () => {
-      setError('Data kelas gagal dimuat. Periksa koneksi Firebase.');
+    }, (snapshotError) => {
+      const backup = loadStudentsBackup();
+      setError(backup
+        ? `Menggunakan salinan di browser ini. Firebase gagal dimuat: ${snapshotError.message}`
+        : `Data kelas gagal dimuat: ${snapshotError.message}`);
       setLoading(false);
     });
   }, [router]);

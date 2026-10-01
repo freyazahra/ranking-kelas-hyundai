@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, createDefaultStudents, normalizeStudents, rankStudents, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
   const [error, setError] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const router = useRouter();
@@ -21,41 +22,85 @@ export default function AdminPage() {
     }
     setIsAuthorized(true);
 
+    const initialBackup = loadStudentsBackup();
+    if (initialBackup) {
+      setStudents(initialBackup.students);
+      setLoading(false);
+      if (initialBackup.pendingSync) {
+        setError('Memulihkan perubahan lokal dan mencoba menyinkronkannya ke Firebase...');
+      }
+    }
+
     const classRef = doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id);
     return onSnapshot(classRef, async (snapshot) => {
+      const backup = loadStudentsBackup();
+      if (backup?.pendingSync) {
+        setStudents(backup.students);
+        setLoading(false);
+        try {
+          await setDoc(classRef, { students: backup.students }, { merge: true });
+          saveStudentsBackup(backup.students, false);
+          setError('Perubahan lokal berhasil disinkronkan ke Firebase.');
+        } catch (syncError) {
+          const details = syncError instanceof Error ? syncError.message : 'Kesalahan tidak diketahui';
+          setError(`Perubahan masih tersimpan di browser ini, tetapi gagal disinkronkan ke Firebase: ${details}`);
+        }
+        return;
+      }
+
       if (snapshot.exists()) {
-        setStudents(normalizeStudents(snapshot.data().students));
+        const remoteStudents = normalizeStudents(snapshot.data().students);
+        setStudents(remoteStudents);
+        saveStudentsBackup(remoteStudents, false);
         setError('');
       } else {
-        const defaults = createDefaultStudents();
+        const defaults = backup?.students ?? createDefaultStudents();
+        setStudents(defaults);
+        setLoading(false);
+        const backupSaved = saveStudentsBackup(defaults, true);
         try {
           await setDoc(classRef, { students: defaults }, { merge: true });
-          setStudents(defaults);
+          saveStudentsBackup(defaults, false);
           setError('');
-        } catch {
-          setError('Data kelas gagal diinisialisasi. Periksa koneksi Firebase.');
+        } catch (initializationError) {
+          const details = initializationError instanceof Error ? initializationError.message : 'Kesalahan tidak diketahui';
+          setError(backupSaved
+            ? `Data tersimpan di browser ini, tetapi gagal diinisialisasi ke Firebase: ${details}`
+            : `Data kelas gagal diinisialisasi di Firebase: ${details}`);
         }
       }
       setLoading(false);
-    }, () => {
-      setError('Data kelas gagal dimuat. Periksa koneksi Firebase.');
+    }, (snapshotError) => {
+      const backup = loadStudentsBackup();
+      setError(backup
+        ? `Menggunakan salinan di browser ini. Firebase gagal dimuat: ${snapshotError.message}`
+        : `Data kelas gagal dimuat: ${snapshotError.message}`);
       setLoading(false);
     });
   }, [router]);
 
   const handleLogout = () => {
+    if (saveStatus === 'saving') return;
     sessionStorage.removeItem('isAdminLoggedIn');
     sessionStorage.removeItem('isStudentLoggedIn');
     router.replace('/');
   };
 
   const saveStudents = async (updated: Student[]) => {
+    setSaveStatus('saving');
+    setError('');
+    const backupSaved = saveStudentsBackup(updated, true);
     setStudents(updated);
     try {
       await setDoc(doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id), { students: updated }, { merge: true });
-      setError('');
-    } catch {
-      setError('Perubahan gagal disimpan. Coba lagi.');
+      saveStudentsBackup(updated, false);
+      setSaveStatus('saved');
+    } catch (saveError) {
+      const details = saveError instanceof Error ? saveError.message : 'Kesalahan tidak diketahui';
+      setError(backupSaved
+        ? `Perubahan tersimpan di browser ini, tetapi gagal disinkronkan ke Firebase: ${details}`
+        : `Perubahan TIDAK tersimpan: Firebase menolak penyimpanan dan backup lokal gagal: ${details}`);
+      setSaveStatus('idle');
     }
   };
 
@@ -91,7 +136,8 @@ export default function AdminPage() {
           </div>
           <button 
             onClick={handleLogout} 
-            className="rounded-full bg-blue-900 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-800 sm:px-4 sm:text-sm"
+            disabled={saveStatus === 'saving'}
+            className="rounded-full bg-blue-900 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60 sm:px-4 sm:text-sm"
           >
             Logout
           </button>
@@ -128,6 +174,11 @@ export default function AdminPage() {
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
           <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta</h2>
+          {saveStatus !== 'idle' && (
+            <p role="status" className="mb-3 text-center text-sm font-bold text-blue-900">
+              {saveStatus === 'saving' ? 'Menyimpan perubahan ke Firebase...' : 'Perubahan berhasil tersimpan.'}
+            </p>
+          )}
           <div className="space-y-2.5">
             {ranked.map((student) => (
               <div key={student.originalIndex} className="flex items-center justify-between gap-2 rounded-[14px] border-2 border-[#f0e2a0] bg-gradient-to-r from-[#fffbe6] to-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-3">
@@ -136,13 +187,13 @@ export default function AdminPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
                   <div className="min-w-0 text-left">
                     <span className="block truncate text-sm font-bold text-slate-800">{student.n}</span>
-                    <button onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 hover:bg-amber-100 transition">✏️ Ubah Panggilan</button>
+                    <button disabled={saveStatus === 'saving'} onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50">✏️ Ubah Panggilan</button>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <div className="flex gap-1">
-                    <button aria-label={`Kurangi poin ${student.n}`} onClick={() => changePoints(student.originalIndex, -1)} className="h-8 w-8 rounded-lg bg-red-500 font-black text-white hover:bg-red-600 transition">−</button>
-                    <button aria-label={`Tambah poin ${student.n}`} onClick={() => changePoints(student.originalIndex, 1)} className="h-8 w-8 rounded-lg bg-blue-600 font-black text-white hover:bg-blue-700 transition">+</button>
+                    <button disabled={saveStatus === 'saving'} aria-label={`Kurangi poin ${student.n}`} onClick={() => changePoints(student.originalIndex, -1)} className="h-8 w-8 rounded-lg bg-red-500 font-black text-white transition hover:bg-red-600 disabled:cursor-wait disabled:opacity-50">−</button>
+                    <button disabled={saveStatus === 'saving'} aria-label={`Tambah poin ${student.n}`} onClick={() => changePoints(student.originalIndex, 1)} className="h-8 w-8 rounded-lg bg-blue-600 font-black text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-50">+</button>
                   </div>
                   <span className="min-w-8 text-right text-lg font-black text-[#2a4a9e]">{student.p}</span>
                 </div>

@@ -11,6 +11,36 @@ export type RankedStudent = Student & {
 
 export const CLASS_SIZE = 32;
 export const CLASS_DOCUMENT = { collection: 'classes', id: 'xpulp_lagoa' } as const;
+const STUDENTS_BACKUP_KEY = 'ranking-kelas-hyundai:students';
+
+export type StudentsBackup = {
+  students: Student[];
+  pendingSync: boolean;
+};
+
+export function loadStudentsBackup(): StudentsBackup | null {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(STUDENTS_BACKUP_KEY) ?? 'null');
+    if (!value || typeof value !== 'object') return null;
+    const backup = value as Record<string, unknown>;
+    if (!Array.isArray(backup.students)) return null;
+    return {
+      students: normalizeStudents(backup.students),
+      pendingSync: backup.pendingSync === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveStudentsBackup(students: Student[], pendingSync: boolean): boolean {
+  try {
+    localStorage.setItem(STUDENTS_BACKUP_KEY, JSON.stringify({ students, pendingSync }));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function createDefaultStudents(): Student[] {
   return Array.from({ length: CLASS_SIZE }, (_, index) => ({ n: `Siswa ${index + 1}`, p: 0 }));
