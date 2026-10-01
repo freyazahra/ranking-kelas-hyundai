@@ -1,5 +1,46 @@
 @import "tailwindcss";
 
+@keyframes login-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes login-arm-sway {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(22deg); }
+}
+
+.login-minion {
+  width: 6rem;
+  margin-inline: auto;
+  animation: login-float 1.4s ease-in-out infinite;
+}
+
+.login-minion-arms { transform-origin: 50px 66px; animation: login-arm-sway 800ms ease-in-out infinite alternate; }
+
+.minion-float { width: 5rem; animation: minion-float 1.2s ease-in-out infinite; transform-origin: bottom center; }
+.minion-arm-left { animation: minion-arm-sway 600ms ease-in-out infinite alternate; transform-origin: 22px 66px; }
+.minion-arm-right { animation: minion-arm-sway 600ms ease-in-out infinite alternate-reverse; transform-origin: 78px 66px; }
+
+@keyframes minion-float {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-12px) rotate(1deg); }
+}
+
+@keyframes minion-arm-sway {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(25deg); }
+}
+
+@media (min-width: 768px) {
+  .login-minion { width: 8rem; }
+  .minion-float { width: 7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-minion, .login-minion-arms, .minion-float, .minion-arm-left, .minion-arm-right { animation: none; }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
