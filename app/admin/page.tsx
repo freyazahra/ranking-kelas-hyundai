@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, CLASS_SIZE, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function AdminPage() {
@@ -40,7 +40,8 @@ export default function AdminPage() {
         try {
           await setDoc(classRef, { students: backup.students }, { merge: true });
           saveStudentsBackup(backup.students, false);
-          setError('Perubahan lokal berhasil disinkronkan ke Firebase.');
+          setError('');
+          setSaveStatus('saved');
         } catch (syncError) {
           const details = syncError instanceof Error ? syncError.message : 'Kesalahan tidak diketahui';
           setError(`Perubahan masih tersimpan di browser ini, tetapi gagal disinkronkan ke Firebase: ${details}`);
@@ -49,10 +50,24 @@ export default function AdminPage() {
       }
 
       if (snapshot.exists()) {
-        const remoteStudents = normalizeStudents(snapshot.data().students);
+        const storedStudents = snapshot.data().students;
+        const remoteStudents = normalizeStudents(storedStudents);
         setStudents(remoteStudents);
         saveStudentsBackup(remoteStudents, false);
         setError('');
+        if (!Array.isArray(storedStudents) || storedStudents.length !== CLASS_SIZE) {
+          setSaveStatus('saving');
+          try {
+            await setDoc(classRef, { students: remoteStudents }, { merge: true });
+            saveStudentsBackup(remoteStudents, false);
+            setSaveStatus('saved');
+          } catch (migrationError) {
+            const details = migrationError instanceof Error ? migrationError.message : 'Kesalahan tidak diketahui';
+            saveStudentsBackup(remoteStudents, true);
+            setSaveStatus('idle');
+            setError(`Pemangkasan data lama di Firebase gagal: ${details}`);
+          }
+        }
       } else {
         const defaults = backup?.students ?? createDefaultStudents();
         setStudents(defaults);
@@ -78,6 +93,12 @@ export default function AdminPage() {
       setLoading(false);
     });
   }, [router]);
+
+  useEffect(() => {
+    if (saveStatus !== 'saved') return;
+    const timeoutId = window.setTimeout(() => setSaveStatus('idle'), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [saveStatus]);
 
   const handleLogout = () => {
     if (saveStatus === 'saving') return;
@@ -151,6 +172,13 @@ export default function AdminPage() {
         </div>
       </header>
 
+      {saveStatus === 'saved' && (
+        <div role="status" aria-live="polite" className="fixed right-4 top-20 z-[100] flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 shadow-lg">
+          <span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">✓</span>
+          Berhasil tersimpan ke database
+        </div>
+      )}
+
       {/* Konten Utama */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 pb-12 sm:px-4">
         <div className="dashboard-hero">
@@ -180,10 +208,10 @@ export default function AdminPage() {
         </div>
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
-          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta <span className="text-base text-blue-700">({students.length} dari 32 siswa)</span></h2>
-          {saveStatus !== 'idle' && (
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta <span className="text-base text-blue-700">({students.length} dari {CLASS_SIZE} siswa)</span></h2>
+          {saveStatus === 'saving' && (
             <p role="status" className="mb-3 text-center text-sm font-bold text-blue-900">
-              {saveStatus === 'saving' ? 'Menyimpan perubahan ke Firebase...' : 'Perubahan berhasil tersimpan.'}
+              Menyimpan perubahan ke Firebase...
             </p>
           )}
           <div className="space-y-2.5">
@@ -194,19 +222,23 @@ export default function AdminPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
                   <div className="min-w-0 text-left">
                     <span className="block truncate text-sm font-bold text-slate-800">{student.n}</span>
-                    <GenderBadge gender={student.gender} />
-                    <button disabled={saveStatus === 'saving'} onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50">✏️ Ubah Panggilan</button>
-                    <select
-                      aria-label={`Gender ${student.n}`}
-                      value={student.gender ?? ''}
-                      disabled={saveStatus === 'saving'}
-                      onChange={(event) => changeGender(student.originalIndex, event.target.value === 'male' || event.target.value === 'female' ? event.target.value : undefined)}
-                      className="ml-1 mt-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-bold text-blue-900 disabled:opacity-50"
-                    >
-                      <option value="">Pilih gender</option>
-                      <option value="male">♂ Laki-laki</option>
-                      <option value="female">♀ Perempuan</option>
-                    </select>
+                    <div className="mt-1.5 flex flex-col items-start gap-2.5">
+                      <GenderBadge gender={student.gender} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button disabled={saveStatus === 'saving'} onClick={() => changeName(student.originalIndex)} className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-blue-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50">✏️ Ubah Panggilan</button>
+                        <select
+                          aria-label={`Gender ${student.n}`}
+                          value={student.gender ?? ''}
+                          disabled={saveStatus === 'saving'}
+                          onChange={(event) => changeGender(student.originalIndex, event.target.value === 'male' || event.target.value === 'female' ? event.target.value : undefined)}
+                          className="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-bold text-blue-900 disabled:opacity-50"
+                        >
+                          <option value="">Pilih gender</option>
+                          <option value="male">♂ Laki-laki</option>
+                          <option value="female">♀ Perempuan</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">

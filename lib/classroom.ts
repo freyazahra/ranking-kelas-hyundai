@@ -10,7 +10,7 @@ export type RankedStudent = Student & {
   rank: number;
 };
 
-export const CLASS_SIZE = 32;
+export const CLASS_SIZE = 31;
 export const CLASS_DOCUMENT = { collection: 'classes', id: 'xpulp_lagoa' } as const;
 const STUDENTS_BACKUP_KEY = 'ranking-kelas-hyundai:students';
 
