@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
-import { Podium, Spotlights } from '@/components/classroom-ui';
+import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
@@ -106,6 +106,13 @@ export default function AdminPage() {
 
   const ranked = rankStudents(students);
   const changePoints = (index: number, delta: number) => saveStudents(students.map((student, studentIndex) => studentIndex === index ? { ...student, p: Math.max(0, student.p + delta) } : student));
+  const changeGender = (index: number, gender: Student['gender']) => saveStudents(students.map((student, studentIndex) => {
+    if (studentIndex !== index) return student;
+    const updated = { ...student };
+    if (gender) updated.gender = gender;
+    else delete updated.gender;
+    return updated;
+  }));
   const changeName = (index: number) => {
     const name = window.prompt('Masukkan nama baru untuk siswa ini:', students[index].n)?.trim();
     if (name) void saveStudents(students.map((student, studentIndex) => studentIndex === index ? { ...student, n: name } : student));
@@ -173,7 +180,7 @@ export default function AdminPage() {
         </div>
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
-          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta</h2>
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Kelola Poin & Nama Peserta <span className="text-base text-blue-700">({students.length} dari 32 siswa)</span></h2>
           {saveStatus !== 'idle' && (
             <p role="status" className="mb-3 text-center text-sm font-bold text-blue-900">
               {saveStatus === 'saving' ? 'Menyimpan perubahan ke Firebase...' : 'Perubahan berhasil tersimpan.'}
@@ -187,7 +194,19 @@ export default function AdminPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
                   <div className="min-w-0 text-left">
                     <span className="block truncate text-sm font-bold text-slate-800">{student.n}</span>
+                    <GenderBadge gender={student.gender} />
                     <button disabled={saveStatus === 'saving'} onClick={() => changeName(student.originalIndex)} className="mt-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-blue-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50">✏️ Ubah Panggilan</button>
+                    <select
+                      aria-label={`Gender ${student.n}`}
+                      value={student.gender ?? ''}
+                      disabled={saveStatus === 'saving'}
+                      onChange={(event) => changeGender(student.originalIndex, event.target.value === 'male' || event.target.value === 'female' ? event.target.value : undefined)}
+                      className="ml-1 mt-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-bold text-blue-900 disabled:opacity-50"
+                    >
+                      <option value="">Pilih gender</option>
+                      <option value="male">♂ Laki-laki</option>
+                      <option value="female">♀ Perempuan</option>
+                    </select>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">

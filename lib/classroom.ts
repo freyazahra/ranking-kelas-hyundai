@@ -1,6 +1,7 @@
 export type Student = {
   n: string;
   p: number;
+  gender?: 'male' | 'female';
   photo?: string;
 };
 
@@ -55,6 +56,7 @@ export function normalizeStudents(value: unknown): Student[] {
     return {
       n: typeof record.n === 'string' && record.n.trim() ? record.n : `Siswa ${index + 1}`,
       p: typeof record.p === 'number' && Number.isFinite(record.p) ? Math.max(0, record.p) : 0,
+      ...(record.gender === 'male' || record.gender === 'female' ? { gender: record.gender } : {}),
       ...(typeof record.photo === 'string' ? { photo: record.photo } : {}),
     };
   });

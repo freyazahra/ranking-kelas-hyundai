@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
-import { Podium, Spotlights } from '@/components/classroom-ui';
+import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
 
 export default function StudentPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
@@ -145,14 +145,17 @@ export default function StudentPage() {
         </div>
 
         <section id="ranking-list" className="mx-auto mt-2 max-w-2xl scroll-mt-20">
-          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Semua Peserta & Poin</h2>
+          <h2 className="mb-4 text-center text-xl font-black text-blue-950">Semua Peserta & Poin <span className="text-base text-blue-700">({students.length} dari 32 siswa)</span></h2>
           <div className="space-y-2.5">
             {ranked.map((student) => (
               <div key={student.originalIndex} className="flex items-center justify-between gap-3 rounded-[14px] border-2 border-[#f0e2a0] bg-gradient-to-r from-[#fffbe6] to-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-blue-950">{student.rank}</div>
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
-                  <span className="truncate font-bold text-slate-800">{student.n}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate font-bold text-slate-800">{student.n}</span>
+                    <GenderBadge gender={student.gender} />
+                  </div>
                 </div>
                 <span className="shrink-0 text-lg font-black text-[#2a4a9e]">{student.p} poin</span>
               </div>
