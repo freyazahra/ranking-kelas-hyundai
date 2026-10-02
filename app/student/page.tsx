@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, CLASS_ROSTER_VERSION, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
+import { ExtraSections } from '@/components/extra-sections';
 
 export default function StudentPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
@@ -60,7 +61,7 @@ export default function StudentPage() {
         setStudents(defaults);
         saveStudentsBackup(defaults, true);
         try {
-          await setDoc(classRef, { students: defaults }, { merge: true });
+          await setDoc(classRef, { students: defaults, rosterVersion: CLASS_ROSTER_VERSION }, { merge: true });
           saveStudentsBackup(defaults, false);
           setError('');
         } catch (initializationError) {
@@ -154,7 +155,7 @@ export default function StudentPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-blue-950 border border-amber-200">{student.n.charAt(0).toUpperCase()}</div>
                   <div className="min-w-0">
                     <span className="block truncate font-bold text-slate-800">{student.n}</span>
-                    <GenderBadge gender={student.gender} />
+                    <GenderBadge gender={student.g} />
                   </div>
                 </div>
                 <span className="shrink-0 text-lg font-black text-[#2a4a9e]">{student.p} poin</span>
@@ -163,6 +164,8 @@ export default function StudentPage() {
           </div>
         </section>
       </main>
+
+      <ExtraSections />
 
       {/* Footer */}
       <footer className="w-full bg-[#2b4c9f] text-white py-6 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 shadow-inner">

@@ -1,0 +1,147 @@
+/* Gaya tambahan tim pengajar dan wall of memories. */
+.extra-sections {
+  width: min(100% - 1.5rem, 1100px);
+  margin: 3.5rem auto;
+  color: #1b1b2f;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+}
+
+.extra-section-heading {
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.extra-section-heading h2 {
+  margin: 0;
+  color: #1b1b2f;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-weight: 900;
+}
+
+.extra-section-heading p {
+  margin: 0.25rem 0 0;
+  color: #606276;
+  font-size: 0.9rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.team-flip-card {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  padding: 0;
+  border: 4px solid #f7d33f;
+  border-radius: 1.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  perspective: 1000px;
+  text-align: center;
+}
+
+.team-flip-card:focus-visible,
+.memory-control:focus-visible,
+.memory-admin-toggle:focus-visible {
+  outline: 3px solid #2a4a9e;
+  outline-offset: 4px;
+}
+
+.team-flip-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  transform-style: preserve-3d;
+  transition: transform 650ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.team-flip-card.is-flipped .team-flip-inner { transform: rotateY(180deg); }
+.team-flip-card:focus-visible .team-flip-inner { outline: 3px solid #2a4a9e; outline-offset: 4px; }
+.team-face { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; border-radius: inherit; backface-visibility: hidden; }
+.team-front { background: #fffbe6; }
+.team-minion { width: min(56%, 180px); height: auto; }
+.team-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.team-back { align-content: center; gap: 0.75rem; padding: 1.25rem; background: #fffbe6; color: #1b1b2f; transform: rotateY(180deg); }
+.team-back strong { color: #2a4a9e; font-size: clamp(1.15rem, 4vw, 1.6rem); font-weight: 900; overflow-wrap: anywhere; }
+.team-back span { font-size: clamp(0.9rem, 3vw, 1.05rem); font-weight: 700; overflow-wrap: anywhere; }
+
+.memories-shell { position: relative; }
+.memory-toolbar { display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.75rem; }
+.memory-control,
+.memory-primary-button {
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  background: #2a4a9e;
+  color: #fff;
+  font: 800 0.9rem var(--font-montserrat), system-ui, sans-serif;
+  cursor: pointer;
+}
+.memory-viewport { overflow: hidden; touch-action: pan-y; cursor: grab; }
+.memory-viewport.is-dragging { cursor: grabbing; user-select: none; }
+.memory-track { display: flex; width: max-content; gap: 1rem; will-change: transform; }
+.memory-card { width: min(76vw, 300px); flex: 0 0 auto; overflow: hidden; border: 3px solid #f7d33f; border-radius: 1rem; background: #fffbe6; box-shadow: 0 5px 0 #2a4a9e; }
+.memory-image-wrap { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: linear-gradient(100deg, #fff8d8 20%, #ffefab 38%, #fff8d8 62%); background-size: 220% 100%; animation: memory-skeleton 1.4s linear infinite; }
+.memory-image-wrap.is-loaded { animation: none; background: #eee8d5; }
+.memory-image { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 180ms ease; }
+.memory-image.is-loaded { opacity: 1; }
+.memory-caption { padding: 0.8rem 0.9rem 1rem; text-align: left; }
+.memory-caption strong { display: block; color: #1b1b2f; font-size: 1rem; font-weight: 900; overflow-wrap: anywhere; }
+.memory-caption span { display: block; margin-top: 0.25rem; color: #2a4a9e; font-size: 0.8rem; font-weight: 800; }
+.memory-caption p { margin: 0.45rem 0 0; color: #606276; font-size: 0.82rem; line-height: 1.45; }
+.memory-empty, .memory-message { padding: 1rem; border-radius: 0.85rem; background: #fffbe6; color: #3b3b50; text-align: center; font-weight: 700; }
+.memory-admin { margin-top: 1rem; }
+.memory-admin-heading { margin: 0 0 0.75rem; color: #1b1b2f; font-size: 1.1rem; font-weight: 900; }
+.memory-admin .memory-form { display: grid; gap: 0.75rem; padding: 1rem; border: 2px solid #f7d33f; border-radius: 1rem; background: #fffbe6; }
+.memory-admin .memory-form label { display: grid; gap: 0.35rem; color: #1b1b2f; font-size: 0.8rem; font-weight: 800; text-align: left; }
+.memory-admin .memory-form input, .memory-admin .memory-form textarea { width: 100%; min-height: 2.7rem; border: 1px solid #d4c778; border-radius: 0.6rem; padding: 0.6rem 0.7rem; background: #fff; color: #1b1b2f; font: 600 0.9rem var(--font-montserrat), system-ui, sans-serif; }
+.memory-admin .memory-form textarea { min-height: 5rem; resize: vertical; }
+.memory-delete-button { display: block; margin: 0.1rem 0.8rem 0.8rem auto; border: 0; border-radius: 0.55rem; padding: 0.45rem 0.7rem; background: #bd342e; color: white; font-size: 0.75rem; font-weight: 800; cursor: pointer; }
+.memory-delete-button:disabled, .memory-primary-button:disabled { cursor: wait; opacity: 0.6; }
+
+@keyframes memory-skeleton { to { background-position-x: -220%; } }
+
+@media (min-width: 560px) {
+  .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
+  .memory-card { width: min(48vw, 320px); }
+  .memory-admin .memory-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .memory-admin .memory-wide { grid-column: 1 / -1; }
+}
+
+@media (min-width: 900px) {
+  .team-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .extra-sections { color: #fff7d1; }
+  :root:not([data-theme="light"]) .extra-section-heading h2,
+  :root:not([data-theme="light"]) .team-back,
+  :root:not([data-theme="light"]) .memory-caption strong { color: #fff7d1; }
+  :root:not([data-theme="light"]) .team-front,
+  :root:not([data-theme="light"]) .team-back,
+  :root:not([data-theme="light"]) .memory-card,
+  :root:not([data-theme="light"]) .memory-empty,
+  :root:not([data-theme="light"]) .memory-message { background-color: #1f2340; }
+  :root:not([data-theme="light"]) .memory-caption span { color: #f7d33f; }
+}
+
+:root[data-theme="dark"] .extra-sections { color: #fff7d1; }
+:root[data-theme="dark"] .extra-section-heading h2,
+:root[data-theme="dark"] .team-back,
+:root[data-theme="dark"] .memory-caption strong { color: #fff7d1; }
+:root[data-theme="dark"] .team-front,
+:root[data-theme="dark"] .team-back,
+:root[data-theme="dark"] .memory-card,
+:root[data-theme="dark"] .memory-empty,
+:root[data-theme="dark"] .memory-message { background-color: #1f2340; }
+:root[data-theme="dark"] .memory-caption span { color: #f7d33f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .team-flip-inner, .memory-image, .memory-image-wrap { transition: none; animation: none; }
+}

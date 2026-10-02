@@ -2,14 +2,14 @@
 
 import type { RankedStudent, Student } from '@/lib/classroom';
 
-export function GenderBadge({ gender }: { gender: Student['gender'] }) {
+export function GenderBadge({ gender }: { gender: Student['g'] | undefined }) {
   if (!gender) return <span className="text-xs font-semibold text-slate-500">Gender belum diatur</span>;
 
-  const isFemale = gender === 'female';
+  const isFemale = gender === 'Perempuan';
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-extrabold ${isFemale ? 'text-pink-700' : 'text-blue-700'}`}>
       <span aria-hidden="true">{isFemale ? '♀' : '♂'}</span>
-      {isFemale ? 'Perempuan' : 'Laki-laki'}
+      {gender}
     </span>
   );
 }
@@ -65,7 +65,7 @@ export function Podium({ students }: { students: RankedStudent[] }) {
             <Minion />
             <div className="my-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-amber-300 text-xs font-black text-blue-900 shadow">{student.n.charAt(0).toUpperCase()}</div>
             <div className="mt-0.5 w-full break-words text-center text-[clamp(12px,3vw,15px)] font-black" title={student.n}>{student.n}</div>
-            {student.gender && <GenderBadge gender={student.gender} />}
+            {student.g && <GenderBadge gender={student.g} />}
             <div className="my-0.5 rounded-full bg-amber-300 px-2.5 py-0.5 text-[11px] font-extrabold text-blue-900">{student.p} poin</div>
             <div className="podium-block flex w-full justify-center rounded-t-xl bg-gradient-to-b from-amber-300 to-yellow-600 pt-1 text-4xl font-black text-blue-900 shadow-[inset_0_-6px_0_rgba(0,0,0,0.08)] transition-[height] duration-500 ease-out" style={{ height: `min(${height}px, 28svh)` }}>{student.rank}</div>
           </div>

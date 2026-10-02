@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CLASS_DOCUMENT, CLASS_SIZE, createDefaultStudents, loadStudentsBackup, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
+import { CLASS_DOCUMENT, CLASS_ROSTER_VERSION, CLASS_SIZE, createDefaultStudents, loadStudentsBackup, migrateStudentsToInitialRoster, normalizeStudents, rankStudents, saveStudentsBackup, type Student } from '@/lib/classroom';
 import { GenderBadge, Podium, Spotlights } from '@/components/classroom-ui';
+import { ExtraSections } from '@/components/extra-sections';
 
 export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>(createDefaultStudents);
@@ -38,7 +39,10 @@ export default function AdminPage() {
         setStudents(backup.students);
         setLoading(false);
         try {
-          await setDoc(classRef, { students: backup.students }, { merge: true });
+          await setDoc(classRef, {
+            students: backup.students,
+            rosterVersion: CLASS_ROSTER_VERSION,
+          }, { merge: true });
           saveStudentsBackup(backup.students, false);
           setError('');
           setSaveStatus('saved');
@@ -50,15 +54,21 @@ export default function AdminPage() {
       }
 
       if (snapshot.exists()) {
-        const storedStudents = snapshot.data().students;
-        const remoteStudents = normalizeStudents(storedStudents);
+        const classData = snapshot.data();
+        const storedStudents = classData.students;
+        const rosterNeedsMigration = classData.rosterVersion !== CLASS_ROSTER_VERSION
+          || !Array.isArray(storedStudents)
+          || storedStudents.length !== CLASS_SIZE;
+        const remoteStudents = rosterNeedsMigration
+          ? migrateStudentsToInitialRoster(storedStudents)
+          : normalizeStudents(storedStudents);
         setStudents(remoteStudents);
         saveStudentsBackup(remoteStudents, false);
         setError('');
-        if (!Array.isArray(storedStudents) || storedStudents.length !== CLASS_SIZE) {
+        if (rosterNeedsMigration) {
           setSaveStatus('saving');
           try {
-            await setDoc(classRef, { students: remoteStudents }, { merge: true });
+            await setDoc(classRef, { students: remoteStudents, rosterVersion: CLASS_ROSTER_VERSION }, { merge: true });
             saveStudentsBackup(remoteStudents, false);
             setSaveStatus('saved');
           } catch (migrationError) {
@@ -74,7 +84,7 @@ export default function AdminPage() {
         setLoading(false);
         const backupSaved = saveStudentsBackup(defaults, true);
         try {
-          await setDoc(classRef, { students: defaults }, { merge: true });
+          await setDoc(classRef, { students: defaults, rosterVersion: CLASS_ROSTER_VERSION }, { merge: true });
           saveStudentsBackup(defaults, false);
           setError('');
         } catch (initializationError) {
@@ -113,7 +123,10 @@ export default function AdminPage() {
     const backupSaved = saveStudentsBackup(updated, true);
     setStudents(updated);
     try {
-      await setDoc(doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id), { students: updated }, { merge: true });
+      await setDoc(doc(db, CLASS_DOCUMENT.collection, CLASS_DOCUMENT.id), {
+        students: updated,
+        rosterVersion: CLASS_ROSTER_VERSION,
+      }, { merge: true });
       saveStudentsBackup(updated, false);
       setSaveStatus('saved');
     } catch (saveError) {
@@ -127,12 +140,9 @@ export default function AdminPage() {
 
   const ranked = rankStudents(students);
   const changePoints = (index: number, delta: number) => saveStudents(students.map((student, studentIndex) => studentIndex === index ? { ...student, p: Math.max(0, student.p + delta) } : student));
-  const changeGender = (index: number, gender: Student['gender']) => saveStudents(students.map((student, studentIndex) => {
+  const changeGender = (index: number, gender: Student['g']) => saveStudents(students.map((student, studentIndex) => {
     if (studentIndex !== index) return student;
-    const updated = { ...student };
-    if (gender) updated.gender = gender;
-    else delete updated.gender;
-    return updated;
+    return { ...student, g: gender };
   }));
   const changeName = (index: number) => {
     const name = window.prompt('Masukkan nama baru untuk siswa ini:', students[index].n)?.trim();
@@ -160,7 +170,7 @@ export default function AdminPage() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="rounded-full border border-amber-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 shadow-xs sm:px-3 sm:text-sm">
-            freya · <span className="text-blue-600">Admin</span>
+            Mentor · <span className="text-blue-600">Admin</span>
           </div>
           <button 
             onClick={handleLogout} 
@@ -223,19 +233,18 @@ export default function AdminPage() {
                   <div className="min-w-0 text-left">
                     <span className="block truncate text-sm font-bold text-slate-800">{student.n}</span>
                     <div className="mt-1.5 flex flex-col items-start gap-2.5">
-                      <GenderBadge gender={student.gender} />
+                      <GenderBadge gender={student.g} />
                       <div className="flex flex-wrap items-center gap-2">
                         <button disabled={saveStatus === 'saving'} onClick={() => changeName(student.originalIndex)} className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-blue-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50">✏️ Ubah Panggilan</button>
                         <select
                           aria-label={`Gender ${student.n}`}
-                          value={student.gender ?? ''}
+                          value={student.g}
                           disabled={saveStatus === 'saving'}
-                          onChange={(event) => changeGender(student.originalIndex, event.target.value === 'male' || event.target.value === 'female' ? event.target.value : undefined)}
+                          onChange={(event) => changeGender(student.originalIndex, event.target.value === 'Perempuan' ? 'Perempuan' : 'Laki-laki')}
                           className="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-bold text-blue-900 disabled:opacity-50"
                         >
-                          <option value="">Pilih gender</option>
-                          <option value="male">♂ Laki-laki</option>
-                          <option value="female">♀ Perempuan</option>
+                          <option value="Laki-laki">♂ Laki-laki</option>
+                          <option value="Perempuan">♀ Perempuan</option>
                         </select>
                       </div>
                     </div>
@@ -253,6 +262,8 @@ export default function AdminPage() {
           </div>
         </section>
       </main>
+
+      <ExtraSections isAdmin />
 
       {/* Footer */}
       <footer className="w-full bg-[#2b4c9f] text-white py-6 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 shadow-inner">
